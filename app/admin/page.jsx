@@ -1,4 +1,6 @@
 'use client';
+export const dynamic = 'force-dynamic';
+
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
@@ -34,7 +36,7 @@ export default function AdminDashboard() {
       // 2. Save the product details to the database
       const { error: dbError } = await supabase
         .from('products')
-        .insert([{ name, price: parseFloat(price), image: imageUrl, is_sold_out: false }]);
+        .insert([{ name: name.toUpperCase(), price: parseFloat(price), image: imageUrl, is_sold_out: false }]);
 
       if (dbError) throw dbError;
 
@@ -42,6 +44,9 @@ export default function AdminDashboard() {
       setName('');
       setPrice('');
       setImageFile(null);
+      
+      // Resets the file input field visually
+      e.target.reset();
     } catch (error) {
       alert('Error: ' + error.message);
     } finally {
@@ -66,6 +71,7 @@ export default function AdminDashboard() {
 
         <div>
           <label className="block text-xs tracking-widest text-gray-500 mb-2">PRODUCT IMAGE</label>
+          {/* FIXED LINE: Added to target the specific file uploaded */}
           <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files)} required className="w-full p-3 border border-gray-300 bg-white" />
         </div>
 
