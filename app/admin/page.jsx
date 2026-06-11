@@ -19,7 +19,8 @@ export default function AdminDashboard() {
 
       // 1. Upload the image to Supabase Storage
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
+        // SAFETY CHECK: Fallback to 'jpg' if the filename behaves weirdly
+        const fileExt = imageFile.name ? imageFile.name.split('.').pop() : 'jpg';
         const fileName = `${Math.random()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
@@ -71,8 +72,8 @@ export default function AdminDashboard() {
 
         <div>
           <label className="block text-xs tracking-widest text-gray-500 mb-2">PRODUCT IMAGE</label>
-          {/* FIXED LINE: Added to target the specific file uploaded */}
-          <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files)} required className="w-full p-3 border border-gray-300 bg-white" />
+          {/* CRITICAL FIX: Ensure files is explicitly targeted */}
+          <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files ? e.target.files : null)} required className="w-full p-3 border border-gray-300 bg-white" />
         </div>
 
         <button type="submit" disabled={loading} className="w-full bg-black text-white py-4 text-xs tracking-widest uppercase font-medium mt-4 hover:bg-gray-800 transition-colors disabled:opacity-50">
