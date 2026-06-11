@@ -1,81 +1,85 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import ProductCard from '../components/ProductCard';
+export const dynamic = 'force-dynamic';
 
-export default function Home() {
-  const [products, setProducts] = useState([]);
-  const [columns, setColumns] = useState(4);
-  const [loading, setLoading] = useState(true);
+import { useState } from 'react';
+import { supabase } from '../../lib/supabase';
 
-  // This hook runs automatically when the page loads to fetch real items
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const { data, error } = await supabase
-          .from('products') // Pulls data directly from your SQL table
-          .select('*')
-          .order('created_at', { ascending: false });
+export default function AdminDashboard() {
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-        if (error) throw error;
-        setProducts(data || []);
-      } catch (error) {
-        console.error('Error loading products:', error.message);
-      } finally {
-        setLoading(false);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      let imageUrl = '';
+
+      // 1. Upload the image to Supabase Storage
+      if (imageFile) {
+        // SAFETY CHECK: Fallback to 'jpg' if the filename behaves weirdly
+        const fileExt = imageFile.name ? imageFile.name.split('.').pop() : 'jpg';
+        const fileName = `${Math.random()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(fileName, imageFile);
+
+        if (uploadError) throw uploadError;
+
+        // Get the public URL to save in the database
+        const { data } = supabase.storage.from('product-images').getPublicUrl(fileName);
+        imageUrl = data.publicUrl;
       }
-    }
 
-    fetchProducts();
-  }, []);
+      // 2. Save the product details to the database
+      const { error: dbError } = await supabase
+        .from('products')
+        .insert([{ name: name.toUpperCase(), price: parseFloat(price), image: imageUrl, is_sold_out: false }]);
+
+      if (dbError) throw dbError;
+
+      alert('Product successfully added to the store!');
+      setName('');
+      setPrice('');
+      setImageFile(null);
+      
+      // Resets the file input field visually
+      e.target.reset();
+    } catch (error) {
+      alert('Error: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <main className="max-w-[1600px] mx-auto px-6 py-12 bg-white min-h-screen">
+    <div className="max-w-2xl mx-auto p-8 mt-12 bg-gray-50 border border-gray-200 rounded">
+      <h1 className="text-2xl font-light tracking-widest uppercase mb-8 text-center">S. Sikamòre Admin</h1>
       
-      <div className="text-center mb-16">
-        <h2 className="text-sm tracking-[0.3em] text-gray-500 mb-2">NEW ARRIVALS</h2>
-        <h1 className="text-3xl font-light tracking-widest uppercase">The S. Sikamòre Collection</h1>
-      </div>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <div>
+          <label className="block text-xs tracking-widest text-gray-500 mb-2">PRODUCT NAME</label>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="w-full p-3 border border-gray-300" placeholder="e.g. LUMIÈRE MAXI DRESS" />
+        </div>
 
-      {/* Toolbar for layout grid switching */}
-      <div className="flex justify-between items-center mb-8 pb-4 border-b border-gray-100 text-xs tracking-wider text-gray-500">
-        <div>{loading ? 'LOADING...' : `SHOWING ${products.length} ITEMS`}</div>
-        
-        <div className="flex items-center gap-3">
-          <span className="mr-2 text-[10px] uppercase">Grid:</span>
-          <button onClick={() => setColumns(2)} className={`p-1 border transition-all ${columns === 2 ? 'border-black text-black' : 'border-gray-200 text-gray-400'}`}>
-            <div className="w-4 h-4 flex gap-[2px]"><div className="w-1/2 h-full bg-current"></div><div className="w-1/2 h-full bg-current"></div></div>
-          </button>
-          <button onClick={() => setColumns(4)} className={`p-1 border transition-all ${columns === 4 ? 'border-black text-black' : 'border-gray-200 text-gray-400'}`}>
-            <div className="w-4 h-4 grid grid-cols-2 gap-[2px]"><div className="bg-current"></div><div className="bg-current"></div><div className="bg-current"></div><div className="bg-current"></div></div>
-          </button>
+        <div>
+          <label className="block text-xs tracking-widest text-gray-500 mb-2">PRICE (₦)</label>
+          <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} required className="w-full p-3 border border-gray-300" placeholder="e.g. 85000" />
         </div>
-      </div>
 
-      {/* Loading Skeleton State */}
-      {loading ? (
-        <div className="text-center py-24 text-xs tracking-widest text-gray-400 uppercase animate-pulse">
-          Loading Collection...
+        <div>
+          <label className="block text-xs tracking-widest text-gray-500 mb-2">PRODUCT IMAGE</label>
+          {/* CRITICAL FIX: Ensure files is explicitly targeted */}
+          <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files ? e.target.files : null)} required className="w-full p-3 border border-gray-300 bg-white" />
         </div>
-      ) : products.length === 0 ? (
-        /* Empty State if no products exist yet */
-        <div className="text-center py-24 text-xs tracking-widest text-gray-400 uppercase">
-          No products found. Use the /admin panel to add your first item!
-        </div>
-      ) : (
-        /* Live Dynamic Product Grid */
-        <div className={`grid gap-x-6 gap-y-12 transition-all duration-500 ${columns === 2 ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4'}`}>
-          {products.map((product) => (
-            <ProductCard key={product.id} product={{
-              id: product.id,
-              name: product.name,
-              price: product.price,
-              image: product.image,
-              isSoldOut: product.is_sold_out
-            }} />
-          ))}
-        </div>
-      )}
-    </main>
+
+        <button type="submit" disabled={loading} className="w-full bg-black text-white py-4 text-xs tracking-widest uppercase font-medium mt-4 hover:bg-gray-800 transition-colors disabled:opacity-50">
+          {loading ? 'Uploading...' : 'Add Product to Store'}
+        </button>
+      </form>
+    </div>
   );
 }
